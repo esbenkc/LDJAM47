@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 /*
 You world need to formulate your problem into a MDP. You need to design the state space, action space, reward function and so on. Your agent will do what it is rewarded to do under the constraints. You may not get the results you want if you design the things differently.
@@ -8,17 +9,38 @@ You world need to formulate your problem into a MDP. You need to design the stat
 public class Manager : MonoBehaviour
 {
     public float timeframe;
-    public int populationSize;//creates population size
-    public GameObject prefab;//holds bot prefab
+    public int populationSize; //creates population size
+    public GameObject prefab; //holds bot prefab
 
-    public int[] layers = new int[3] { 5, 3, 2 };//initializing network to the right size
+    [SerializeField]
+    TMP_Text console;
+
+    string consoleContent;
+
+    public string ConsoleContent
+    {
+        get { return consoleContent; }
+        set
+        {
+            consoleContent = value;
+            console.text = consoleContent;
+        }
+    }
+
+    int iteration = 0;
+
+    public int[] layers = new int[3] { 5, 3, 2 }; //initializing network to the right size
 
     [Range(0.0001f, 1f)] public float MutationChance = 0.01f;
 
     [Range(0f, 1f)] public float MutationStrength = 0.5f;
 
+    [Header("Settings")]
+
     // Rewards and punishment variables
-    public bool punishForHittingWalls = false, rewardForHittingTarget = false, punishForDistance = false;
+    public bool punishForHittingWalls = false;
+
+    public bool rewardForHittingTarget = false, punishForDistance = false;
 
     // Booleans for control
     public bool useRays = true;
@@ -27,18 +49,18 @@ public class Manager : MonoBehaviour
     public int rayAmount = 10;
     public float rayAngle = 20;
 
-
     //public List<Bot> Bots;
     public List<NeuralNetwork> networks;
     private List<Agent> agents;
 
-    void Start()// Start is called before the first frame update
+    void Start() // Start is called before the first frame update
     {
+        console.text = consoleContent;
         // if (populationSize % 2 != 0)
         //     populationSize = 50;//if population size is not even, sets it to fifty
 
         InitNetworks();
-        InvokeRepeating("CreateAgents", 0.1f, timeframe);//repeating function
+        InvokeRepeating("CreateAgents", 0.1f, timeframe); //repeating function
     }
 
     /// <summary>
@@ -68,16 +90,16 @@ public class Manager : MonoBehaviour
         {
             for (int i = 0; i < agents.Count; i++)
             {
-                GameObject.Destroy(agents[i].gameObject);//if there are Prefabs in the scene this will get rid of them
+                GameObject.Destroy(agents[i].gameObject); //if there are Prefabs in the scene this will get rid of them
             }
 
-            SortNetworks();//this sorts networks and mutates them
+            SortNetworks(); //this sorts networks and mutates them
         }
 
         agents = new List<Agent>();
         for (int i = 0; i < populationSize; i++)
         {
-            Agent agent = (Instantiate(prefab, new Vector2(0, 0), new Quaternion(0, 0, 1, 0))).GetComponent<Agent>();//create agents
+            Agent agent = (Instantiate(prefab, new Vector2(-5, -2), new Quaternion(0, 0, 1, 0))).GetComponent<Agent>(); //create agents
             agent.network = networks[i]; //deploys network to each learner
             agent.punishForDistance = punishForDistance;
             agent.punishForHittingWalls = punishForHittingWalls;
@@ -96,11 +118,12 @@ public class Manager : MonoBehaviour
     {
         for (int i = 0; i < populationSize; i++)
         {
-            agents[i].UpdateFitness();//gets bots to set their corrosponding networks fitness
+            agents[i].UpdateFitness(); //gets bots to set their corrosponding networks fitness
         }
         networks.Sort();
-        networks[populationSize - 1].Save("Assets/Save.txt");//saves networks weights and biases to file, to preserve network performance
-        Debug.Log("Fitness: " + networks[populationSize - 1].fitness);
+        networks[populationSize - 1].Save("Assets/Save.txt"); //saves networks weights and biases to file, to preserve network performance
+        ConsoleContent += iteration + ".best-fitness=" + networks[populationSize - 1].fitness + "\n";
+        iteration++;
         for (int i = 0; i < populationSize / 2; i++)
         {
             networks[i] = networks[i + populationSize / 2].copy(new NeuralNetwork(layers));

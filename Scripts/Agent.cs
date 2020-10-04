@@ -83,8 +83,13 @@ public class Agent : MonoBehaviour
         // transform.rotation = Quaternion.Euler(0, 0, transform.eulerAngles.z + 1 * output[0] * rotation); // Turning
         // transform.position = new Vector2(transform.position.x, transform.position.y + 1 * output[1] * Time.deltaTime); // Moving
 
-        transform.Rotate(new Vector3(0, 0, 1 * output[0] * rotation), Space.World);
-        transform.Translate(new Vector2(1 * output[1] * speed * Time.deltaTime, 0), Space.Self);
+        transform.Rotate(new Vector3(0, 0, 1 * output[0] * rotation * Time.deltaTime), Space.World);
+        transform.Translate(new Vector2(0, 1 * output[1] * speed * Time.deltaTime), Space.Self);
+
+        for (int i = 0; i < rays.Length; i++)
+        {
+            lrs[i].SetPositions(new Vector3[] { transform.position, (new Vector2(transform.position.x, transform.position.y) + rays[i].normalized * 3) });
+        }
 
         // currentTime += Time.deltaTime;
         // if (currentTime > 5)
@@ -94,15 +99,6 @@ public class Agent : MonoBehaviour
         // }
     }
 
-
-    private void OnDrawGizmos()
-    {
-        Gizmos.color = new Color(0, 1, 0, 0.4f);
-        for (int i = 0; i < rays.Length; i++)
-        {
-            lrs[i].SetPositions(new Vector3[] { transform.position, (new Vector2(transform.position.x, transform.position.y) + rays[i].normalized * 3) });
-        }
-    }
 
     private void OnCollisionStay2D(Collision2D collision)
     {
