@@ -10,6 +10,8 @@ public class Human : MonoBehaviour
     [SerializeField]
     Vector2[] velocityStates;
 
+    Vector3 init;
+
     private float currentTime = 0;
 
     private Rigidbody2D rb2d;
@@ -17,6 +19,7 @@ public class Human : MonoBehaviour
     private void Start()
     {
         rb2d = transform.GetComponent<Rigidbody2D>();
+        init = transform.position;
     }
 
     private void FixedUpdate()

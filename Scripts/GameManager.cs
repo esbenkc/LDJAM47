@@ -1,12 +1,20 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
     [Header("Scene Manipulation")]
     [SerializeField]
-    UnityEngine.SceneManagement.Scene[] levels;
+    string[] levels;
+
+    [SerializeField]
+    int currentLevel = -1;
+
+
+    [SerializeField]
+    Manager manager;
 
     [Header("Animation")]
     [SerializeField]
@@ -29,25 +37,67 @@ public class GameManager : MonoBehaviour
 
     float currentTime = 0;
 
+    [Header("UI")]
+    [SerializeField]
+    GameObject titleScreen;
 
+    [SerializeField]
+    GameObject gameUI, winPanel, infoPanel;
 
-    public IEnumerator Transition()
+    public void NextLevel()
+    {
+        if (currentLevel != -1)
+        {
+            SceneManager.UnloadSceneAsync(levels[currentLevel]);
+            manager.SelectAgent();
+        }
+        currentLevel++;
+        if (currentLevel < levels.Length)
+            SceneManager.LoadSceneAsync(levels[currentLevel], LoadSceneMode.Additive);
+        else
+            WinGameCompletely();
+        Time.timeScale = 1;
+    }
+
+    public void WinGameCompletely()
+    {
+        StartTransition(true);
+    }
+
+    private void Start()
+    {
+        winPanel.SetActive(false);
+        infoPanel.SetActive(false);
+        gameUI.SetActive(false);
+    }
+
+    public void StartTransition(bool reverse = false)
+    {
+        titleScreen.SetActive(false);
+        StartCoroutine(Transition(reverse));
+    }
+
+    public IEnumerator Transition(bool reverse = false)
     {
         Vector2 pPlayer = player.position, pComputer = computer.position, pWall = wall.position;
-        float v = 0, pCamSize = cam.orthographicSize;
+        float v = 0, pCamSize = cam.orthographicSize, mult = (reverse ? -1 : 1);
+
 
         while (currentTime < transitionTime)
         {
-            v = interpolation.Evaluate(currentTime);
+            v = interpolation.Evaluate(currentTime / transitionTime);
 
-            player.position = pPlayer + tPlayer * v;
-            computer.position = pComputer + tComputer * v;
-            wall.position = pWall + tWall * v;
-            cam.orthographicSize = pCamSize + camSize * v;
+            player.position = pPlayer + mult * tPlayer * v;
+            computer.position = pComputer + mult * tComputer * v;
+            wall.position = pWall + mult * tWall * v;
+            cam.orthographicSize = pCamSize + mult * camSize * v;
 
             currentTime += Time.deltaTime;
             yield return null;
         }
+        gameUI.SetActive(true);
+        infoPanel.SetActive(true);
+        NextLevel();
     }
 
 }

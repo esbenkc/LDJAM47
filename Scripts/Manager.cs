@@ -10,7 +10,7 @@ public class Manager : MonoBehaviour
 {
     public float timeframe;
     public int populationSize; //creates population size
-    public GameObject prefab; //holds bot prefab
+    public GameObject prefab, selectedPrefab; //holds bot prefab
 
     [SerializeField]
     TMP_Text console;
@@ -40,7 +40,7 @@ public class Manager : MonoBehaviour
     // Rewards and punishment variables
     public bool punishForHittingWalls = false;
 
-    public bool rewardForHittingTarget = false, punishForDistance = false;
+    public bool rewardForHittingTarget = false, punishForDistance = false, rewardForPath = false;
 
     // Booleans for control
     public bool useRays = true;
@@ -51,16 +51,74 @@ public class Manager : MonoBehaviour
 
     //public List<Bot> Bots;
     public List<NeuralNetwork> networks;
-    private List<Agent> agents;
+    private Agent[] agents;
+    private bool selected = false;
+
+    string buttonText = "Try with best agent", buttonTextSelected = "Go back to training";
+    [Header("UI")]
+    [SerializeField]
+    TMP_Text button;
+
+    public void PunishForHittingWalls(bool val)
+    {
+        punishForHittingWalls = val;
+    }
+
+    public void RewardForHittingTarget(bool val)
+    {
+        rewardForHittingTarget = val;
+    }
+
+    public void PunishForDistance(bool val)
+    {
+        punishForDistance = val;
+    }
+    public void RewardForPath(bool val)
+    {
+        rewardForPath = val;
+    }
+
+    public float trainingTime = 0, seekTime = 0;
+    private bool trainingTimeGo = false, seekTimeGo = false;
+
+    [SerializeField]
+    TMP_Text winText;
+    string winTextText;
+
+    [SerializeField]
+    GameObject winUI;
 
     void Start() // Start is called before the first frame update
     {
+        winTextText = winText.text;
         console.text = consoleContent;
+        console.fontSize = 10;
         // if (populationSize % 2 != 0)
         //     populationSize = 50;//if population size is not even, sets it to fifty
 
         InitNetworks();
-        InvokeRepeating("CreateAgents", 0.1f, timeframe); //repeating function
+    }
+
+    private void FixedUpdate()
+    {
+        if (trainingTimeGo) trainingTime += Time.deltaTime;
+        if (seekTimeGo) seekTime += Time.deltaTime;
+    }
+
+    public void StartLoopTraining()
+    {
+        trainingTimeGo = true;
+        StartCoroutine(LoopTraining());
+    }
+
+    IEnumerator LoopTraining()
+    {
+        yield return new WaitForSeconds(0.1f);
+        while (!selected)
+        {
+            CreateAgents();
+            yield return new WaitForSeconds(timeframe);
+        }
     }
 
     /// <summary>
@@ -82,13 +140,13 @@ public class Manager : MonoBehaviour
     }
 
     /// <summary>
-    /// Sets timeScale to Gamespeed, removes all existing agents, and instantiates new ones (population size) with given network from networks[i] that has been sorted.
+    /// Removes all existing agents and instantiates new ones (population size) with given network from networks[i] that has been sorted.
     /// </summary>
     public void CreateAgents()
     {
         if (agents != null)
         {
-            for (int i = 0; i < agents.Count; i++)
+            for (int i = 0; i < agents.Length; i++)
             {
                 GameObject.Destroy(agents[i].gameObject); //if there are Prefabs in the scene this will get rid of them
             }
@@ -96,7 +154,7 @@ public class Manager : MonoBehaviour
             SortNetworks(); //this sorts networks and mutates them
         }
 
-        agents = new List<Agent>();
+        agents = new Agent[populationSize];
         for (int i = 0; i < populationSize; i++)
         {
             Agent agent = (Instantiate(prefab, new Vector2(-5, -2), new Quaternion(0, 0, 1, 0))).GetComponent<Agent>(); //create agents
@@ -107,8 +165,64 @@ public class Manager : MonoBehaviour
             agent.useRays = useRays;
             agent.rayAmount = rayAmount;
             agent.rayAngle = rayAngle;
-            agents.Add(agent);
+            agents[i] = agent;
         }
+    }
+
+    /// <summary>
+    /// Selects highest grade agent and plays the level with that guy.
+    /// </summary>
+    public void SelectAgent()
+    {
+        if (!selected)
+        {
+            seekTimeGo = true;
+            selected = true;
+            if (agents != null)
+            {
+                for (int i = 0; i < agents.Length; i++)
+                {
+                    GameObject.Destroy(agents[i].gameObject); //if there are Prefabs in the scene this will get rid of them
+                }
+
+                SortNetworks(); //this sorts networks and mutates them
+            }
+            agents = new Agent[1];
+            Debug.Log(networks[networks.Count - 1].fitness);
+            Agent agent = (Instantiate(selectedPrefab, new Vector2(-5, -2), new Quaternion(0, 0, 1, 0))).GetComponent<Agent>(); //create agent
+            agent.network = networks[networks.Count - 1]; //deploys network to selected agent
+            agent.punishForDistance = punishForDistance;
+            agent.punishForHittingWalls = punishForHittingWalls;
+            agent.rewardForHittingTarget = rewardForHittingTarget;
+            agent.useRays = useRays;
+            agent.rayAmount = rayAmount;
+            agent.rayAngle = rayAngle;
+            agents[0] = agent;
+
+            buttonText = button.text;
+            button.text = buttonTextSelected;
+        }
+        else
+        {
+            seekTimeGo = false;
+            seekTime = 0;
+            selected = false;
+            button.text = buttonText;
+            StartLoopTraining();
+        }
+    }
+
+    /// <summary>
+    /// Activates pop-up noting how quickly the level was finished (time to training, time to target) and offering the next level.
+    /// </summary>
+    /// <param name="winner">The selected agent</param>
+    public void WinGame(Agent winner)
+    {
+        seekTimeGo = false;
+        trainingTimeGo = false;
+        winText.text = string.Format(winTextText, trainingTime.ToString(), seekTime.ToString());
+        Time.timeScale = 0;
+        winUI.SetActive(true);
     }
 
     /// <summary>
@@ -116,18 +230,31 @@ public class Manager : MonoBehaviour
     /// </summary>
     public void SortNetworks()
     {
-        for (int i = 0; i < populationSize; i++)
+        if (agents.Length == populationSize)
         {
-            agents[i].UpdateFitness(); //gets bots to set their corrosponding networks fitness
+
+            for (int i = 0; i < populationSize; i++)
+            {
+                agents[i].UpdateFitness(); //gets bots to set their corrosponding networks fitness
+            }
+            networks.Sort();
+            networks[populationSize - 1].Save("Assets/Save.txt"); //saves networks weights and biases to file, to preserve network performance
+            ConsoleContent += iteration + ".best-fitness=" + networks[populationSize - 1].fitness + "\n";
+            iteration++;
+            for (int i = 0; i < populationSize / 2; i++)
+            {
+                networks[i] = networks[i + populationSize / 2].copy(new NeuralNetwork(layers));
+                networks[i].Mutate((int)(1 / MutationChance), MutationStrength);
+            }
         }
-        networks.Sort();
-        networks[populationSize - 1].Save("Assets/Save.txt"); //saves networks weights and biases to file, to preserve network performance
-        ConsoleContent += iteration + ".best-fitness=" + networks[populationSize - 1].fitness + "\n";
-        iteration++;
-        for (int i = 0; i < populationSize / 2; i++)
+        else
         {
-            networks[i] = networks[i + populationSize / 2].copy(new NeuralNetwork(layers));
-            networks[i].Mutate((int)(1 / MutationChance), MutationStrength * (-networks[i + populationSize / 2].fitness));
+            ConsoleContent += iteration + ".best-fitness=" + networks[populationSize - 1].fitness + "\n";
+            for (int i = 0; i < populationSize; i++)
+            {
+                networks[i] = networks[networks.Count - 1].copy(new NeuralNetwork(layers));
+                networks[i].Mutate((int)(1 / MutationChance), MutationStrength);
+            }
         }
     }
 

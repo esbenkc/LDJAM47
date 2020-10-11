@@ -18,7 +18,7 @@ public class Agent : MonoBehaviour
     private bool touchedTarget = false, spottedTarget = false;
 
     // Rewards and punishment variables s
-    public bool punishForHittingWalls = false, rewardForHittingTarget = false, punishForDistance = false;
+    public bool punishForHittingWalls = false, rewardForHittingTarget = false, punishForDistance = false, rewardForPath = false;
 
     // Booleans for control
     public bool useRays = true;
@@ -35,6 +35,12 @@ public class Agent : MonoBehaviour
 
     LineRenderer[] lrs;
 
+    [SerializeField]
+    bool selectedAgent = false;
+
+    private Manager manager;
+    int distance = 0;
+
     private void Start()
     {
         rays = new Vector2[rayAmount];
@@ -45,6 +51,8 @@ public class Agent : MonoBehaviour
         {
             lrs[i] = Instantiate(lrprefab, this.transform).GetComponent<LineRenderer>();
         }
+
+        manager = (selectedAgent ? GameObject.Find("Manager").GetComponent<Manager>() : null);
     }
 
     private void FixedUpdate()
@@ -84,7 +92,7 @@ public class Agent : MonoBehaviour
         // transform.position = new Vector2(transform.position.x, transform.position.y + 1 * output[1] * Time.deltaTime); // Moving
 
         transform.Rotate(new Vector3(0, 0, 1 * output[0] * rotation * Time.deltaTime), Space.World);
-        transform.Translate(new Vector2(0, 1 * output[1] * speed * Time.deltaTime), Space.Self);
+        transform.Translate(new Vector2(0, 1 * Mathf.Abs(output[1]) * speed * Time.deltaTime), Space.Self);
 
         for (int i = 0; i < rays.Length; i++)
         {
@@ -99,6 +107,19 @@ public class Agent : MonoBehaviour
         // }
     }
 
+    public void AddDistance(int n)
+    {
+        if (distance < n) distance = n;
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (rewardForPath && other.gameObject.layer == 11)
+        {
+            Debug.Log((int)other.gameObject.name[10]);
+            distance = (int)other.gameObject.name[10];
+        }
+    }
 
     private void OnCollisionStay2D(Collision2D collision)
     {
@@ -108,16 +129,20 @@ public class Agent : MonoBehaviour
         }
         if (rewardForHittingTarget && collision.collider.gameObject.layer == 9)
         {
-            fitness += 0.5f;
             touchedTarget = true;
         }
-
+        if (selectedAgent && collision.collider.gameObject.layer == 9)
+        {
+            manager.WinGame(this);
+            selectedAgent = false;
+        }
     }
 
     public void UpdateFitness()
     {
         network.fitness = fitness
         - (punishForDistance ? (Vector2.Distance(transform.position, target.position) * 0.1f) : 0)
-        + (touchedTarget ? 1 : -1);
+        + (touchedTarget ? 4 : -1)
+        + distance;
     }
 }
